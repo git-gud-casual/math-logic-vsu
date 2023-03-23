@@ -1,12 +1,14 @@
-from PySide6 import QtCore, QtWidgets
+from PySide6 import QtCore, QtWidgets, QtGui
 from os import getcwd
 from typing import List, Optional
 
 from ui import Ui_MainWindow
-import matrix_funcs
+from .MatrixCalculateQThread import MatrixCalculateQThread
 
 
 class MainWindow(QtWidgets.QMainWindow):
+    calc_thread: MatrixCalculateQThread
+
     def __init__(self):
         super(MainWindow, self).__init__()
         self.ui = Ui_MainWindow()
@@ -15,48 +17,27 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.addLineBtn.clicked.connect(self.add_line)
         self.ui.deleteLineBtn.clicked.connect(self.del_line)
         self.ui.loadFromFileBtn.clicked.connect(self.load_matrix_from_file)
-        self.ui.getAnswersBtn.clicked.connect(self.get_answers)
+        self.ui.getAnswersBtn.clicked.connect(self.start_calc_thread)
+
+        self.calc_thread = MatrixCalculateQThread()
+        self.calc_thread.result_signal.connect(self.print_result)
 
     @QtCore.Slot()
-    def get_answers(self):
+    def print_result(self, result):
+        self.ui.answersPlainText.setPlainText(result)
+
+    @QtCore.Slot()
+    def start_calc_thread(self):
         matrix = self.get_matrix_from_table()
         if matrix:
-            if not self.is_correct_matrix(matrix):
-                self.ui.answersPlainText.setPlainText("Error: matrix_funcs has wrong format")
-            try:
-                solves = self.calculate(matrix)
-                if isinstance(solves, list):
-                    self.ui.answersPlainText.setPlainText(", ".join(map(str, solves)))
-                else:
-                    self.ui.answersPlainText.setPlainText("System of linear equations has infinity solves")
-            except ZeroDivisionError:
-                self.ui.answersPlainText.setPlainText("System of linear equations has not any "
-                                                      "solves")
-
-    @staticmethod
-    def calculate(matrix: List[List[int]]) -> Optional[List[float] | float]:
-        reversed_matrix = []
-        for i in range(len(matrix)):
-            for j in range(len(matrix[i])):
-                if len(reversed_matrix) <= j:
-                    reversed_matrix.append([])
-                reversed_matrix[j].append(matrix[i][j])
-
-        solves = []
-        delta0 = matrix_funcs.determinant(reversed_matrix[:-1])
-        has_inf_solves = delta0 == 0
-        for i in range(len(reversed_matrix) - 1):
-            temp = reversed_matrix[i]
-            reversed_matrix[i] = reversed_matrix[-1]
-            delta = matrix_funcs.determinant(reversed_matrix[:-1])
-
-            has_inf_solves = has_inf_solves and delta == 0
-            if not has_inf_solves:
-                solves.append(delta / delta0)
-            reversed_matrix[i] = temp
-        if has_inf_solves:
-            return float("inf")
-        return solves
+            if self.calc_thread.isRunning():
+                self.ui.answersPlainText.setPlainText("Calculating now")
+            elif not self.is_correct_matrix(matrix):
+                self.ui.answersPlainText.setPlainText("Error: matrix has wrong format")
+            else:
+                self.ui.answersPlainText.setPlainText("Starting calculation")
+                self.calc_thread.set_matrix(matrix)
+                self.calc_thread.start()
 
     @QtCore.Slot()
     def load_matrix_from_file(self):
@@ -93,7 +74,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.coeffTable.setRowCount(len(matrix))
         self.ui.freeCoeffTable.setRowCount(len(matrix))
         if len(matrix) > 0:
-            self.ui.coeffTable.setColumnCount(len(matrix[0]))
+            self.ui.coeffTable.setColumnCount(len(matrix[0]) - 1)
 
         for i, line in enumerate(matrix):
             for j, val in enumerate(line):
@@ -128,3 +109,8 @@ class MainWindow(QtWidgets.QMainWindow):
         for line in file:
             matrix.append(list(map(int, line.split())))
         return matrix
+
+    def closeEvent(self, event: QtGui.QCloseEvent) -> None:
+        if self.calc_thread.isRunning():
+            self.calc_thread.terminate()
+        event.accept()

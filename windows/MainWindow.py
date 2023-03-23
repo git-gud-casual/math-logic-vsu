@@ -25,13 +25,16 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.ui.answersPlainText.setPlainText("Error: matrix_funcs has wrong format")
             try:
                 solves = self.calculate(matrix)
-                self.ui.answersPlainText.setPlainText(", ".join(map(str, solves)))
+                if isinstance(solves, list):
+                    self.ui.answersPlainText.setPlainText(", ".join(map(str, solves)))
+                else:
+                    self.ui.answersPlainText.setPlainText("System of linear equations has infinity solves")
             except ZeroDivisionError:
                 self.ui.answersPlainText.setPlainText("System of linear equations has not any "
-                                                      "solves or has infinity solves")
+                                                      "solves")
 
     @staticmethod
-    def calculate(matrix: List[List[int]]) -> Optional[List[float]]:
+    def calculate(matrix: List[List[int]]) -> Optional[List[float] | float]:
         reversed_matrix = []
         for i in range(len(matrix)):
             for j in range(len(matrix[i])):
@@ -41,13 +44,18 @@ class MainWindow(QtWidgets.QMainWindow):
 
         solves = []
         delta0 = matrix_funcs.determinant(reversed_matrix[:-1])
-        print(delta0)
+        has_inf_solves = delta0 == 0
         for i in range(len(reversed_matrix) - 1):
             temp = reversed_matrix[i]
             reversed_matrix[i] = reversed_matrix[-1]
             delta = matrix_funcs.determinant(reversed_matrix[:-1])
-            solves.append(delta / delta0)
+
+            has_inf_solves = has_inf_solves and delta == 0
+            if not has_inf_solves:
+                solves.append(delta / delta0)
             reversed_matrix[i] = temp
+        if has_inf_solves:
+            return float("inf")
         return solves
 
     @QtCore.Slot()

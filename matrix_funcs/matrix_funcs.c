@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
+
 int64_t get_matrix_determinant(size_t rows, size_t columns, int64_t matrix[rows][columns]) {
     if (rows <= 1 && columns <= 1) {
         return matrix[0][0];
@@ -154,6 +155,6 @@ static struct PyModuleDef matrixModule = {
     determinantMethods
 };
 
-PyMODINIT_FUNC PyInit_matrix() {
+PyMODINIT_FUNC PyInit_matrix_funcs() {
     return PyModule_Create(&matrixModule);
 }
